@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF View & Edit Studio</title>
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- PDF.js ライブラリ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- pdf-lib ライブラリ -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+
+  <!-- トップツールバー -->
+  <header class="toolbar">
+    <div class="toolbar-group">
+      <button id="toggle-sidebar-btn" class="btn" title="サイドバー切替">☰ サイドバー</button>
+      <label class="btn btn-primary" for="file-input">
+        📁 開く
+        <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+      </label>
+      <button id="close-pdf-btn" class="btn btn-danger" title="PDFを閉じる">❌ 閉じる</button>
+    </div>
+
+    <!-- 保存メニュー（ドロップダウン） -->
+    <div class="toolbar-group">
+      <div class="dropdown" id="save-dropdown-wrapper">
+        <button id="save-menu-btn" class="btn btn-success">
+          💾 保存 <span class="arrow">▾</span>
+        </button>
+        <div id="save-dropdown-menu" class="dropdown-content">
+          <button id="overwrite-save-btn">
+            📄 上書き保存 <span class="shortcut">Ctrl+S</span>
+          </button>
+          <button id="save-as-btn">
+            📝 名前を付けて保存...
+          </button>
+        </div>
+      </div>
+      <button id="download-pdf-btn" class="btn" style="display: none;">ダウンロード</button>
+    </div>
+
+    <!-- ページズーム & 回転 -->
+    <div class="toolbar-group">
+      <button id="zoom-out-btn" class="btn">🔍-</button>
+      <span id="zoom-level" class="info-label">120%</span>
+      <button id="zoom-in-btn" class="btn">🔍+</button>
+      <button id="zoom-reset-btn" class="btn">リセット</button>
+      <button id="rotate-left-btn" class="btn" title="左90度回転">↺</button>
+      <button id="rotate-right-btn" class="btn" title="右90度回転">↻</button>
+    </div>
+
+    <!-- 印刷関連 -->
+    <div class="toolbar-group print-group">
+      <span class="page-counter"><span id="current-page">0</span> / <span id="total-pages">0</span> 頁</span>
+      <input type="number" id="print-start" value="1" min="1" class="num-input">
+      <span>〜</span>
+      <input type="number" id="print-end" value="1" min="1" class="num-input">
+      <button id="range-print-btn" class="btn">🖨️ 範囲印刷</button>
+      <button id="full-print-btn" class="btn">🖨️ 全体印刷</button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ領域 -->
+  <main class="app-main">
+    <!-- サイドバー -->
+    <aside id="sidebar" class="sidebar">
+      <!-- タブ切り替え -->
+      <div class="tab-header">
+        <button id="tab-thumb" class="tab-btn active">サムネイル</button>
+        <button id="tab-outline" class="tab-btn">目次</button>
+      </div>
+
+      <!-- サムネイル一覧 & 並び替え表示 -->
+      <div id="thumbnail-view" class="tab-content active">
+        <div class="thumb-hint">PDFを読み込むとサムネイルが表示されます</div>
+      </div>
+
+      <!-- 目次表示 -->
+      <div id="outline-view" class="tab-content" style="display: none;">
+        <div class="placeholder-text">目次がありません</div>
+      </div>
+
+      <!-- 編集ツールパネル -->
+      <div class="tools-panel">
+        <h3>🛠️ PDF 編集ツール</h3>
+
+        <!-- ① PDF結合 -->
+        <div class="tool-card">
+          <label class="tool-title">📎 ファイル結合</label>
+          <label class="btn btn-secondary btn-block" for="merge-file-input">
+            末尾にPDFを追加
+            <input type="file" id="merge-file-input" accept="application/pdf" multiple style="display: none;">
+          </label>
+        </div>
+
+        <!-- ② N-in-1 集約合成 -->
+        <div class="tool-card">
+          <label class="tool-title">🧩 N-in-1 集約合成</label>
+          <div class="tool-row">
+            <select id="nup-select" class="select-box">
+              <option value="2">2 in 1</option>
+              <option value="3">3 in 1</option>
+              <option value="4" selected>4 in 1</option>
+            </select>
+            <label class="btn btn-secondary" for="nup-file-input">
+              選択して合成
+              <input type="file" id="nup-file-input" accept="application/pdf" multiple style="display: none;">
+            </label>
+          </div>
+        </div>
+
+        <!-- ③ ページ指定削除 -->
+        <div class="tool-card">
+          <label class="tool-title">🗑️ ページ削除</label>
+          <div class="tool-row">
+            <input type="text" id="delete-pages-input" placeholder="例: 2, 4-6" class="text-input">
+            <button id="delete-pages-btn" class="btn btn-danger">削除</button>
+          </div>
+        </div>
+
+        <!-- ④ ページ分割・抽出 -->
+        <div class="tool-card">
+          <label class="tool-title">✂️ ページ抽出保存</label>
+          <div class="tool-row">
+            <input type="text" id="split-pages-input" placeholder="例: 1-3, 5" class="text-input">
+            <button id="split-pages-btn" class="btn btn-primary">抽出</button>
+          </div>
+        </div>
+
+        <!-- ⑤ テキスト抽出 CSV化 -->
+        <div class="tool-card">
+          <label class="tool-title">📊 テキストデータ出力</label>
+          <button id="extract-text-btn" class="btn btn-block">CSVとして抽出</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- メインビューア表示部 -->
+    <section id="viewer-container" class="viewer-container">
+      <div class="placeholder-text">PDFファイルをドラッグ＆ドロップするか「開く」から選択してください</div>
+    </section>
+  </main>
+
+  <!-- ドラッグ＆ドロップ オーバーレイ -->
+  <div id="drop-overlay" class="drop-overlay">
+    <div class="drop-message">📁 ここにPDFファイルをドロップ</div>
+  </div>
+
+  <!-- プログレスバー & ローディングモーダル -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-card">
+      <div id="loading-text" class="loading-text">PDFを処理中... 0%</div>
+      <div class="progress-bar-bg">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 印刷用非表示コンテナ -->
+  <div id="print-container" class="print-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
